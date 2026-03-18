@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdmin } from "@/lib/supabase";
 import {
   generateTweetsWithAIImproved,
   distributeScheduleTimes,
   validateTweet,
 } from "@/lib/ai-improved";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-// Falls back to anon key so the route works even without SERVICE_ROLE_KEY
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error("Missing Supabase configuration");
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface Account {
   id: string;
@@ -75,6 +65,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[AI] Generating ${count} tweets about "${topic}"`);
 
+    const supabase = getSupabaseAdmin();
     const tweets = await generateTweetsWithAIImproved({ topic, tone, count });
     const scheduleTimes = distributeScheduleTimes(tweets.length);
 

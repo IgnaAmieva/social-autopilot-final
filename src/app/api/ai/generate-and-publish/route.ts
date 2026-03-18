@@ -1,14 +1,9 @@
 // src/app/api/ai/generate-and-publish/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase';
 import { generateTweetsWithAI } from '@/lib/ai';
 import { createTypefullyDraft } from '@/lib/typefully';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 interface RequestBody {
   topic: string;
@@ -18,6 +13,7 @@ interface RequestBody {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseClient();
     const body: RequestBody = await request.json();
     const { topic, tone = 'mixed', publishNow = true } = body;
 

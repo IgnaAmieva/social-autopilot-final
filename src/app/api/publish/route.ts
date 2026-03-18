@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { getSupabaseClient } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // POST: publicar un post específico por ID
 export async function POST(request: NextRequest) {
+  const supabase = getSupabaseClient();
   const body = await request.json();
   const { post_id } = body;
 
@@ -15,7 +12,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "post_id es requerido" }, { status: 400 });
   }
 
-  // Obtener el post con su cuenta
   const { data: post, error: postError } = await supabase
     .from("posts")
     .select("*, accounts(*)")
@@ -30,12 +26,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "El post ya fue publicado" }, { status: 400 });
   }
 
-  const result = await publishTweet(post);
+  const result = await publishTweet(supabase, post);
   return NextResponse.json(result);
 }
 
 // GET: publicar todos los posts programados cuya hora ya pasó
 export async function GET() {
+  const supabase = getSupabaseClient();
   const now = new Date().toISOString();
 
   const { data: posts, error } = await supabase
@@ -54,7 +51,7 @@ export async function GET() {
 
   const results = [];
   for (const post of posts) {
-    const result = await publishTweet(post);
+    const result = await publishTweet(supabase, post);
     results.push(result);
   }
 
@@ -69,12 +66,14 @@ export async function GET() {
   });
 }
 
-async function publishTweet(post: {
-  id: string;
-  content: string;
-  accounts: { access_token: string; refresh_token: string | null; token_expires_at: string | null; id: string };
-}) {
-  // Marcar como "publishing"
+async function publishTweet(
+  supabase: SupabaseClient,
+  post: {
+    id: string;
+    content: string;
+    accounts: { access_token: string; refresh_token: string | null; token_expires_at: string | null; id: string };
+  }
+) {
   await supabase
     .from("posts")
     .update({ status: "publishing", updated_at: new Date().toISOString() })
@@ -83,11 +82,10 @@ async function publishTweet(post: {
   try {
     let accessToken = post.accounts.access_token;
 
-    // Verificar si el token expiró y refrescar si es necesario
     if (post.accounts.token_expires_at && post.accounts.refresh_token) {
       const expiresAt = new Date(post.accounts.token_expires_at);
       if (expiresAt < new Date()) {
-        const newToken = await refreshAccessToken(post.accounts.refresh_token, post.accounts.id);
+        const newToken = await refreshAccessToken(supabase, post.accounts.refresh_token, post.accounts.id);
         if (newToken) {
           accessToken = newToken;
         } else {
@@ -96,7 +94,6 @@ async function publishTweet(post: {
       }
     }
 
-    // Publicar en X
     const tweetResponse = await fetch("https://api.twitter.com/2/tweets", {
       method: "POST",
       headers: {
@@ -112,7 +109,6 @@ async function publishTweet(post: {
       throw new Error(tweetData.detail || tweetData.title || "Error al publicar en X");
     }
 
-    // Actualizar post como publicado
     await supabase
       .from("posts")
       .update({
@@ -141,7 +137,11 @@ async function publishTweet(post: {
   }
 }
 
-async function refreshAccessToken(refreshToken: string, accountId: string): Promise<string | null> {
+async function refreshAccessToken(
+  supabase: SupabaseClient,
+  refreshToken: string,
+  accountId: string
+): Promise<string | null> {
   try {
     const response = await fetch("https://api.twitter.com/2/oauth2/token", {
       method: "POST",
@@ -164,7 +164,6 @@ async function refreshAccessToken(refreshToken: string, accountId: string): Prom
       return null;
     }
 
-    // Actualizar tokens en la base de datos
     await supabase
       .from("accounts")
       .update({
