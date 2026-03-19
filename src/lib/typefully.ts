@@ -1,7 +1,12 @@
 // src/lib/typefully.ts
 
 const TYPEFULLY_API_BASE = 'https://api.typefully.com/v2';
-const TYPEFULLY_API_KEY = process.env.TYPEFULLY_API_KEY;
+
+function getApiKey(): string {
+  const key = process.env.TYPEFULLY_API_KEY;
+  if (!key) throw new Error("Missing TYPEFULLY_API_KEY environment variable");
+  return key;
+}
 
 export interface TypefullyDraft {
   id: string;
@@ -37,7 +42,7 @@ export async function getTypefullySocialSets(): Promise<{
   const response = await fetch(`${TYPEFULLY_API_BASE}/social-sets`, {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${TYPEFULLY_API_KEY}`,
+      Authorization: `Bearer ${getApiKey()}`,
       'Content-Type': 'application/json',
     },
   });
@@ -51,8 +56,7 @@ export async function getTypefullySocialSets(): Promise<{
 
 // Crear un draft en Typefully
 export async function createTypefullyDraft(
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-socialSetId: string, content: string, publishAt?: string, p0?: Date | undefined): Promise<TypefullyDraft> {
+socialSetId: string, content: string, publishAt?: string): Promise<TypefullyDraft> {
   const payload: Record<string, unknown> = {
     platforms: {
       x: {
@@ -75,7 +79,7 @@ socialSetId: string, content: string, publishAt?: string, p0?: Date | undefined)
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${TYPEFULLY_API_KEY}`,
+        Authorization: `Bearer ${getApiKey()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -102,7 +106,7 @@ export async function publishTypefullyDraft(
     {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${TYPEFULLY_API_KEY}`,
+        Authorization: `Bearer ${getApiKey()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

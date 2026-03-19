@@ -5,6 +5,7 @@ import {
   distributeScheduleTimes,
   validateTweet,
 } from "@/lib/ai-improved";
+import { createTypefullyDraft } from "@/lib/typefully";
 
 
 interface Account {
@@ -104,6 +105,17 @@ export async function POST(request: NextRequest) {
           throw new Error(validation.errors.join("; "));
         }
 
+        if (!account.typefully_social_set_id) {
+          throw new Error(`Account @${account.username} has no Typefully social set ID`);
+        }
+
+        const publishAt = publishNow ? "now" : scheduledTime.toISOString();
+        const draft = await createTypefullyDraft(
+          account.typefully_social_set_id,
+          tweet.text,
+          publishAt
+        );
+
         const { data: dbRecord } = await supabase
           .from("ai_generated_posts")
           .insert({
@@ -111,7 +123,7 @@ export async function POST(request: NextRequest) {
             topic,
             tone: tweet.tone,
             content: tweet.text,
-            typefully_draft_id: `draft-${Date.now()}-${i}`,
+            typefully_draft_id: draft.id,
             scheduled_time: scheduledTime.toISOString(),
             status: publishNow ? "published" : "scheduled",
           })
