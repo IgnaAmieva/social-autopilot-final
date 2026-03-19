@@ -280,6 +280,11 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <p className="text-sm text-gray-800 leading-relaxed">{tweet.text}</p>
+                      {tweet.error && (
+                        <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1 mt-2 font-mono break-all">
+                          Error: {tweet.error}
+                        </p>
+                      )}
                       <p className="text-xs text-gray-400 mt-2">
                         📅 {new Date(tweet.scheduled_time).toLocaleString("es-ES", {
                           day: "2-digit", month: "short",

@@ -154,6 +154,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const firstError = failedTweets[0]?.error;
     return NextResponse.json({
       success: failedTweets.length === 0,
       tweetsGenerated: tweets.length,
@@ -161,6 +162,7 @@ export async function POST(request: NextRequest) {
       tweetsFailed: failedTweets.length,
       tweets: [...publishedTweets, ...failedTweets],
       summary: `Generated ${tweets.length} tweets across ${accounts.length} accounts. Scheduled: ${publishedTweets.length}, Failed: ${failedTweets.length}.`,
+      error: failedTweets.length > 0 ? firstError : undefined,
     });
   } catch (error) {
     console.error("[API] Error:", error);
