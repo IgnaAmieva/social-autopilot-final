@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getAnthropicClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 export type TweetTone = "casual" | "professional" | "humorous" | "inspiracional" | "educativo" | "provocativo";
 
@@ -35,7 +37,7 @@ Reglas estrictas:
 - Sin comillas al inicio o final
 - SOLO devuelve el tweet, sin explicaciones ni texto adicional`;
 
-  const message = await client.messages.create({
+  const message = await getAnthropicClient().messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 120,
     messages: [{ role: "user", content: prompt }],

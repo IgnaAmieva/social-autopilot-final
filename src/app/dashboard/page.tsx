@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
-import Navbar from "@/components/Navbar";
+export const dynamic = "force-dynamic";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { getSupabaseClient } from "@/lib/supabase";
+import Navbar from "@/components/Navbar";
 
 type TweetTone = "casual" | "professional" | "humorous" | "inspiracional" | "educativo" | "provocativo";
 
@@ -70,6 +67,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function DashboardPage() {
+  const supabase = useMemo(() => getSupabaseClient(), []);
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState<TweetTone>("casual");
   const [count, setCount] = useState(5);
@@ -98,7 +96,7 @@ export default function DashboardPage() {
     const { data } = await query;
     if (data) setRecentPosts(data as unknown as RecentPost[]);
     setLoadingPosts(false);
-  }, [statusFilter, dateFilter]);
+  }, [statusFilter, dateFilter, supabase]);
 
   useEffect(() => { fetchRecentPosts(); }, [fetchRecentPosts]);
 

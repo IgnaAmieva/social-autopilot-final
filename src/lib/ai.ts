@@ -2,7 +2,9 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+function getAnthropicClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 interface GenerateTweetsOptions {
   topic: string;
@@ -28,7 +30,7 @@ Requirements:
 
 Return ONLY the tweets, one per line, numbered 1-${count}.`;
 
-  const message = await anthropic.messages.create({
+  const message = await getAnthropicClient().messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 1024,
     messages: [{ role: "user", content: prompt }],

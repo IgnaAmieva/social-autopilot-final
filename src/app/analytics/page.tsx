@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { getSupabaseClient } from "@/lib/supabase";
 import {
   BarChart,
   Bar,
@@ -14,10 +17,6 @@ import {
 } from "recharts";
 import Navbar from "@/components/Navbar";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 const TONE_LABELS: Record<string, string> = {
   casual: "Casual",
@@ -76,6 +75,7 @@ function StatCard({ label, value, sub, icon }: { label: string; value: number; s
 }
 
 export default function AnalyticsPage() {
+  const supabase = useMemo(() => getSupabaseClient(), []);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -86,24 +86,34 @@ export default function AnalyticsPage() {
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
-    let query = supabase
-      .from("ai_generated_posts")
-      .select("id, content, tone, status, scheduled_time, created_at, account_id, accounts(username)")
-      .order("created_at", { ascending: false })
-      .limit(1000);
+    try {
+      let query = supabase
+        .from("ai_generated_posts")
+        .select("id, content, tone, status, scheduled_time, created_at, account_id, accounts(username)")
+        .order("created_at", { ascending: false })
+        .limit(1000);
 
-    if (statusFilter !== "all") query = query.eq("status", statusFilter);
-    if (toneFilter !== "all") query = query.eq("tone", toneFilter);
-    if (dateFrom) query = query.gte("created_at", `${dateFrom}T00:00:00`);
-    if (dateTo) query = query.lte("created_at", `${dateTo}T23:59:59`);
+      if (statusFilter !== "all") query = query.eq("status", statusFilter);
+      if (toneFilter !== "all") query = query.eq("tone", toneFilter);
+      if (dateFrom) query = query.gte("created_at", `${dateFrom}T00:00:00`);
+      if (dateTo) query = query.lte("created_at", `${dateTo}T23:59:59`);
 
-    const { data } = await query;
-    if (data) setPosts(data as unknown as Post[]);
-    setLoading(false);
-  }, [statusFilter, toneFilter, dateFrom, dateTo]);
+      const { data, error } = await query;
+      if (error) {
+        console.error("Error fetching posts:", error);
+      } else if (data) {
+        setPosts(data as unknown as Post[]);
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, toneFilter, dateFrom, dateTo, supabase]);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { fetchPosts(); }, [fetchPosts]);
+  useEffect(() => {
+    fetchPosts();
+  }, [fetchPosts]);
 
   // --- Stats ---
   const now = new Date();
