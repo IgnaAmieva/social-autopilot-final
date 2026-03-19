@@ -42,7 +42,7 @@ export async function getTypefullySocialSets(): Promise<{
   const response = await fetch(`${TYPEFULLY_API_BASE}/social-sets`, {
     method: 'GET',
     headers: {
-      Authorization: `Bearer ${getApiKey()}`,
+      'X-API-KEY': `Bearer ${getApiKey()}`,
       'Content-Type': 'application/json',
     },
   });
@@ -79,7 +79,7 @@ socialSetId: string, content: string, publishAt?: string): Promise<TypefullyDraf
     {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${getApiKey()}`,
+        'X-API-KEY': `Bearer ${getApiKey()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -106,7 +106,7 @@ export async function publishTypefullyDraft(
     {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${getApiKey()}`,
+        'X-API-KEY': `Bearer ${getApiKey()}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

@@ -66,8 +66,15 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Single shared client instance for this page
+let _supabaseClient: ReturnType<typeof getSupabaseClient> | null = null;
+function getClient() {
+  if (!_supabaseClient) _supabaseClient = getSupabaseClient();
+  return _supabaseClient;
+}
+
 export default function DashboardPage() {
-  const supabase = useMemo(() => getSupabaseClient(), []);
+  const supabase = useMemo(() => getClient(), []);
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState<TweetTone>("casual");
   const [count, setCount] = useState(5);
