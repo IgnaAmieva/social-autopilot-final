@@ -66,15 +66,8 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-// Single shared client instance for this page
-let _supabaseClient: ReturnType<typeof getSupabaseClient> | null = null;
-function getClient() {
-  if (!_supabaseClient) _supabaseClient = getSupabaseClient();
-  return _supabaseClient;
-}
-
 export default function DashboardPage() {
-  const supabase = useMemo(() => getClient(), []);
+  const supabase = useMemo(() => getSupabaseClient(), []);
   const [topic, setTopic] = useState("");
   const [tone, setTone] = useState<TweetTone>("casual");
   const [count, setCount] = useState(5);
@@ -90,6 +83,7 @@ export default function DashboardPage() {
   const [dateFilter, setDateFilter] = useState("");
 
   const fetchRecentPosts = useCallback(async () => {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return;
     setLoadingPosts(true);
     let query = supabase
       .from("ai_generated_posts")

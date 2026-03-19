@@ -87,9 +87,9 @@ socialSetId: string, content: string, publishAt?: string): Promise<TypefullyDraf
   );
 
   if (!response.ok) {
-    const error = await response.json();
+    const body = await response.text();
     throw new Error(
-      `Failed to create draft: ${error.message || response.statusText}`
+      `Typefully ${response.status}: ${body || response.statusText}`
     );
   }
 
