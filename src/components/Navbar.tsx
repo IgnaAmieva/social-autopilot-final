@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
 
 const links = [
   { href: "/", label: "Inicio" },
@@ -15,6 +16,18 @@ const links = [
 export default function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    window.location.replace("/login");
+  }
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/5" style={{ background: "#0d0d0d" }}>
@@ -44,7 +57,7 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop links */}
+          {/* Desktop links + logout */}
           <div className="hidden md:flex items-center gap-0.5">
             {links.map((l) => {
               const active = pathname === l.href;
@@ -63,6 +76,17 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            <div className="ml-3 pl-3 border-l border-white/10">
+              <button
+                onClick={handleLogout}
+                disabled={loggingOut}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white/35 hover:text-white/70 hover:bg-white/6 transition-colors disabled:opacity-40"
+                title="Cerrar sesión"
+              >
+                {loggingOut ? "..." : "Salir"}
+              </button>
+            </div>
           </div>
 
           {/* Mobile hamburger */}
@@ -102,6 +126,13 @@ export default function Navbar() {
                 </Link>
               );
             })}
+            <button
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="block w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-white/35 hover:bg-white/6 hover:text-white/60 transition-colors disabled:opacity-40"
+            >
+              {loggingOut ? "Cerrando sesión..." : "Cerrar sesión"}
+            </button>
           </div>
         )}
       </div>

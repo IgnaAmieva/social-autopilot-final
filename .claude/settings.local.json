@@ -8,7 +8,10 @@
       "Bash(npx tsc:*)",
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(export PATH=\"$HOME/.nvm/versions/node/v22.22.2/bin:$PATH\")",
-      "Bash(node ./node_modules/.bin/tsc --noEmit)"
+      "Bash(node ./node_modules/.bin/tsc --noEmit)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('dependencies',{}\\).keys\\(\\)\\)\")",
+      "Bash(npm install *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d['dependencies'].get\\('@supabase/ssr', 'NOT FOUND'\\)\\)\")"
     ]
   }
 }
