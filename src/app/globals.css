@@ -3,6 +3,14 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* NDSocial brand tokens */
+  --nd-black:        #0d0d0d;
+  --nd-red-dark:     #7f1d1d;
+  --nd-red:          #b91c1c;
+  --nd-orange:       #c2410c;
+  --nd-orange-light: #ea580c;
+  --nd-warm-bg:      #f7f6f4;
 }
 
 @theme inline {
@@ -12,15 +20,47 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ── Primary gradient button ─────────────────────────────────────────────── */
+/* Use alongside Tailwind layout/spacing/text utilities */
+.nd-btn-primary {
+  background: linear-gradient(135deg, var(--nd-red-dark) 0%, var(--nd-orange) 100%);
+  box-shadow: 0 4px 14px rgba(127, 29, 29, 0.28);
+  transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s;
+}
+.nd-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #991b1b 0%, var(--nd-orange-light) 100%);
+  box-shadow: 0 4px 18px rgba(127, 29, 29, 0.38);
+}
+.nd-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Secondary brand button (outline) ───────────────────────────────────── */
+.nd-btn-secondary {
+  color: var(--nd-red);
+  border: 1px solid #fecaca;
+  background: transparent;
+  transition: background 0.15s ease, color 0.15s;
+}
+.nd-btn-secondary:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #991b1b;
+}
+.nd-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Brand focus ring (for inputs/selects that can't use Tailwind JIT) ───── */
+.nd-focus:focus {
+  outline: none;
+  border-color: var(--nd-red);
+  box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.12);
 }

@@ -15,8 +15,7 @@ export async function GET(request: NextRequest) {
         `
         *,
         accounts:account_id (
-          username,
-          display_name
+          username
         )
       `
       )

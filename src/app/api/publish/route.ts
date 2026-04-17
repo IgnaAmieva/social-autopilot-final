@@ -71,12 +71,18 @@ async function publishTweet(
   post: {
     id: string;
     content: string;
-    accounts: { access_token: string; refresh_token: string | null; token_expires_at: string | null; id: string };
+    accounts: {
+      access_token: string;
+      refresh_token: string | null;
+      token_expires_at: string | null;
+      id: string;
+    };
   }
 ) {
+  // Mark as publishing (no updated_at — column does not exist in accounts)
   await supabase
     .from("posts")
-    .update({ status: "publishing", updated_at: new Date().toISOString() })
+    .update({ status: "publishing" })
     .eq("id", post.id);
 
   try {
@@ -85,7 +91,11 @@ async function publishTweet(
     if (post.accounts.token_expires_at && post.accounts.refresh_token) {
       const expiresAt = new Date(post.accounts.token_expires_at);
       if (expiresAt < new Date()) {
-        const newToken = await refreshAccessToken(supabase, post.accounts.refresh_token, post.accounts.id);
+        const newToken = await refreshAccessToken(
+          supabase,
+          post.accounts.refresh_token,
+          post.accounts.id
+        );
         if (newToken) {
           accessToken = newToken;
         } else {
@@ -116,21 +126,17 @@ async function publishTweet(
         platform_post_id: tweetData.data.id,
         published_at: new Date().toISOString(),
         error_message: null,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", post.id);
 
     return { success: true, post_id: post.id, tweet_id: tweetData.data.id };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Error desconocido";
+    console.error("[publish] Tweet failed:", errorMessage);
 
     await supabase
       .from("posts")
-      .update({
-        status: "failed",
-        error_message: errorMessage,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ status: "failed", error_message: errorMessage })
       .eq("id", post.id);
 
     return { success: false, post_id: post.id, error: errorMessage };
@@ -160,10 +166,11 @@ async function refreshAccessToken(
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Refresh token error:", data);
+      console.error("[publish] Refresh token error:", data);
       return null;
     }
 
+    // Update OAuth tokens only — no updated_at (column does not exist)
     await supabase
       .from("accounts")
       .update({
@@ -172,13 +179,12 @@ async function refreshAccessToken(
         token_expires_at: data.expires_in
           ? new Date(Date.now() + data.expires_in * 1000).toISOString()
           : null,
-        updated_at: new Date().toISOString(),
       })
       .eq("id", accountId);
 
     return data.access_token;
   } catch (err) {
-    console.error("Refresh error:", err);
+    console.error("[publish] Refresh error:", err);
     return null;
   }
 }

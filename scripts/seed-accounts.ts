@@ -46,11 +46,7 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Typefully social set ID shared by all test accounts
-const TYPEFULLY_SOCIAL_SET_ID = "291333";
-
-function randomId() {
-  return Math.random().toString(36).slice(2, 18);
-}
+const TYPEFULLY_SOCIAL_SET_ID = 291333;
 
 async function seedAccounts() {
   console.log("\n🌱 Seeding 20 test accounts...\n");
@@ -58,22 +54,20 @@ async function seedAccounts() {
   const accounts = Array.from({ length: 20 }, (_, i) => {
     const n = i + 1;
     return {
-      platform: "twitter",
-      platform_user_id: `test_uid_${randomId()}`,
       username: `test_account_${n}`,
-      display_name: `Test Account ${n}`,
-      avatar_url: null,
-      access_token: `fake_token_${n}_${randomId()}`,
-      refresh_token: null,
-      token_expires_at: null,
       typefully_social_set_id: TYPEFULLY_SOCIAL_SET_ID,
-      typefully_account_label: `account_${n}`,
-      typefully_enabled: true,
-      created_at_typefully: new Date().toISOString(),
+      typefully_api_key: null,
+      niche: null,
+      subniche: null,
+      system_prompt: null,
+      tone: "casual",
+      language: "es",
+      evergreen_only: false,
+      tweets_per_day_default: 5,
+      enabled: true,
     };
   });
 
-  // Insert in a single batch
   const { data, error } = await supabase
     .from("accounts")
     .insert(accounts)

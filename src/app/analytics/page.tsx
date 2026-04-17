@@ -16,7 +16,6 @@ import {
 } from "recharts";
 import Navbar from "@/components/Navbar";
 
-
 const TONE_LABELS: Record<string, string> = {
   casual: "Casual",
   professional: "Profesional",
@@ -44,17 +43,18 @@ interface Post {
   accounts: { username: string } | null;
 }
 
-const PALETTE = ["#3b82f6", "#a78bfa", "#fb923c", "#34d399", "#f87171", "#fbbf24"];
+// Brand-forward palette: red/orange first, then complementary data colors
+const PALETTE = ["#b91c1c", "#c2410c", "#d97706", "#16a34a", "#7c3aed", "#0891b2"];
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    scheduled: "bg-blue-100 text-blue-700 border border-blue-200",
-    published: "bg-green-100 text-green-700 border border-green-200",
-    failed: "bg-red-100 text-red-700 border border-red-200",
-    draft: "bg-gray-100 text-gray-600 border border-gray-200",
+    scheduled: "bg-orange-50 text-orange-700 border border-orange-200",
+    published:  "bg-green-50 text-green-700 border border-green-200",
+    failed:     "bg-red-50 text-red-700 border border-red-200",
+    draft:      "bg-stone-100 text-stone-500 border border-stone-200",
   };
   return (
-    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${styles[status] ?? "bg-gray-100 text-gray-600"}`}>
+    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${styles[status] ?? "bg-stone-100 text-stone-500"}`}>
       {STATUS_LABELS[status] ?? status}
     </span>
   );
@@ -62,16 +62,20 @@ function StatusBadge({ status }: { status: string }) {
 
 function StatCard({ label, value, sub, icon }: { label: string; value: number; sub?: string; icon: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+    <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm">
       <div className="flex items-start justify-between mb-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+        <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">{label}</p>
         <span className="text-xl">{icon}</span>
       </div>
       <p className="text-3xl font-extrabold text-gray-900">{value.toLocaleString("es-ES")}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-stone-400 mt-1">{sub}</p>}
     </div>
   );
 }
+
+// Shared filter input classes
+const filterSelect = "border border-stone-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-red-600 focus:ring-1 focus:ring-red-100";
+const filterInput  = "border border-stone-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-red-600";
 
 export default function AnalyticsPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
@@ -88,7 +92,7 @@ export default function AnalyticsPage() {
     try {
       let query = supabase
         .from("ai_generated_posts")
-        .select("id, content, tone, status, scheduled_time, created_at, account_id, accounts(username)")
+        .select("id, content, tone, status, scheduled_time, created_at, account_id, accounts!account_id(username)")
         .order("created_at", { ascending: false })
         .limit(1000);
 
@@ -98,11 +102,8 @@ export default function AnalyticsPage() {
       if (dateTo) query = query.lte("created_at", `${dateTo}T23:59:59`);
 
       const { data, error } = await query;
-      if (error) {
-        console.error("Error fetching posts:", error);
-      } else if (data) {
-        setPosts(data as unknown as Post[]);
-      }
+      if (error) { console.error("Error fetching posts:", error); }
+      else if (data) { setPosts(data as unknown as Post[]); }
     } catch (err) {
       console.error("Unexpected error:", err);
     } finally {
@@ -110,20 +111,18 @@ export default function AnalyticsPage() {
     }
   }, [statusFilter, toneFilter, dateFrom, dateTo, supabase]);
 
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+  useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
-  // --- Stats ---
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfToday.getDate() - 7);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const todayCount = posts.filter(p => new Date(p.created_at) >= startOfToday).length;
-  const weekCount = posts.filter(p => new Date(p.created_at) >= startOfWeek).length;
-  const monthCount = posts.filter(p => new Date(p.created_at) >= startOfMonth).length;
+  const todayCount  = posts.filter(p => new Date(p.created_at) >= startOfToday).length;
+  const weekCount   = posts.filter(p => new Date(p.created_at) >= startOfWeek).length;
+  const monthCount  = posts.filter(p => new Date(p.created_at) >= startOfMonth).length;
 
   // By tone
   const toneMap: Record<string, number> = {};
@@ -161,33 +160,31 @@ export default function AnalyticsPage() {
     const name = p.accounts?.username ?? p.account_id;
     accountMap[name] = (accountMap[name] ?? 0) + 1;
   });
-  const topAccounts = Object.entries(accountMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
+  const topAccounts = Object.entries(accountMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   const last10 = posts.slice(0, 10);
   const hasFilters = statusFilter !== "all" || toneFilter !== "all" || dateFrom || dateTo;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-stone-50">
       <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard de Analytics</h1>
-          <p className="text-gray-500 mt-1">Rendimiento y estadísticas de tus tweets generados.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Analytics</h1>
+          <p className="text-stone-500 mt-1">Rendimiento y estadísticas de tus tweets generados.</p>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-6 shadow-sm">
+        <div className="bg-white rounded-2xl border border-stone-200 p-4 mb-6 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtros</span>
+            <span className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Filtros</span>
 
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-blue-400"
+              className={filterSelect}
             >
               <option value="all">Todos los estados</option>
               <option value="scheduled">Programado</option>
@@ -198,7 +195,7 @@ export default function AnalyticsPage() {
             <select
               value={toneFilter}
               onChange={(e) => setToneFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 bg-white focus:outline-none focus:border-blue-400"
+              className={filterSelect}
             >
               <option value="all">Todos los tonos</option>
               {Object.entries(TONE_LABELS).map(([val, label]) => (
@@ -207,38 +204,28 @@ export default function AnalyticsPage() {
             </select>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">Desde</span>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400"
-              />
-              <span className="text-xs text-gray-400">Hasta</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-700 focus:outline-none focus:border-blue-400"
-              />
+              <span className="text-xs text-stone-400">Desde</span>
+              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={filterInput} />
+              <span className="text-xs text-stone-400">Hasta</span>
+              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={filterInput} />
             </div>
 
             {hasFilters && (
               <button
                 onClick={() => { setStatusFilter("all"); setToneFilter("all"); setDateFrom(""); setDateTo(""); }}
-                className="text-xs text-blue-500 hover:text-blue-700 transition-colors font-medium"
+                className="text-xs text-red-700 hover:text-red-900 transition-colors font-medium"
               >
                 Limpiar filtros
               </button>
             )}
 
-            <span className="ml-auto text-xs text-gray-400">
+            <span className="ml-auto text-xs text-stone-400">
               {loading ? "Cargando..." : `${posts.length} registros`}
             </span>
           </div>
         </div>
 
-        {/* Stat Cards — 2x2 grid */}
+        {/* Stat cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard icon="📅" label="Hoy" value={todayCount} sub="tweets generados hoy" />
           <StatCard icon="📆" label="Esta semana" value={weekCount} sub="últimos 7 días" />
@@ -246,13 +233,13 @@ export default function AnalyticsPage() {
           <StatCard icon="📊" label="Total filtrado" value={posts.length} sub="con filtros actuales" />
         </div>
 
-        {/* Charts — 3 cols */}
+        {/* Charts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {/* Tweets por Tono */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Tweets por Tono</h3>
             {toneData.length === 0 ? (
-              <p className="text-center text-gray-400 text-xs py-10">Sin datos</p>
+              <p className="text-center text-stone-400 text-xs py-10">Sin datos</p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -270,7 +257,7 @@ export default function AnalyticsPage() {
                     fontSize={10}
                   />
                   <Tooltip
-                    contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 8, fontSize: 12 }}
                     formatter={(v) => [v, ""]}
                   />
                 </PieChart>
@@ -279,40 +266,40 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Tweets por Estado */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Tweets por Estado</h3>
             {statusData.length === 0 ? (
-              <p className="text-center text-gray-400 text-xs py-10">Sin datos</p>
+              <p className="text-center text-stone-400 text-xs py-10">Sin datos</p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={statusData} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#a8a29e" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#a8a29e" }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="value" fill="#b91c1c" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </div>
 
           {/* Top 5 cuentas */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm">
+          <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">Top 5 Cuentas</h3>
             {topAccounts.length === 0 ? (
-              <p className="text-center text-gray-400 text-xs py-10">Sin datos</p>
+              <p className="text-center text-stone-400 text-xs py-10">Sin datos</p>
             ) : (
               <div className="space-y-3 mt-1">
                 {topAccounts.map(([name, count], i) => (
                   <div key={name}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-gray-600 truncate font-medium">@{name}</span>
-                      <span className="text-gray-400 ml-2 shrink-0">{count}</span>
+                      <span className="text-stone-400 ml-2 shrink-0">{count}</span>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-stone-100 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full"
                         style={{
-                          width: `${(count / (topAccounts[0][1])) * 100}%`,
+                          width: `${(count / topAccounts[0][1]) * 100}%`,
                           background: PALETTE[i % PALETTE.length],
                         }}
                       />
@@ -325,56 +312,58 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Mejor horario */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm mb-6">
+        <div className="bg-white rounded-2xl border border-stone-200 p-5 shadow-sm mb-6">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Mejor Horario de Publicación</h3>
           {posts.filter(p => p.scheduled_time).length === 0 ? (
-            <p className="text-center text-gray-400 text-xs py-8">Sin datos de horario</p>
+            <p className="text-center text-stone-400 text-xs py-8">Sin datos de horario</p>
           ) : (
             <ResponsiveContainer width="100%" height={140}>
               <BarChart data={hourData} margin={{ top: 0, right: 0, bottom: 0, left: -28 }}>
                 <XAxis
                   dataKey="hora"
-                  tick={{ fontSize: 9, fill: "#9ca3af" }}
+                  tick={{ fontSize: 9, fill: "#a8a29e" }}
                   axisLine={false}
                   tickLine={false}
                   interval={3}
                 />
-                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#a8a29e" }} axisLine={false} tickLine={false} />
                 <Tooltip
-                  contentStyle={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 12 }}
+                  contentStyle={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 8, fontSize: 12 }}
                   formatter={(v) => [`${v ?? 0} tweets`, "Publicaciones"]}
                 />
-                <Bar dataKey="tweets" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="tweets" fill="#b91c1c" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
         {/* Últimos 10 tweets */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+        <div className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-700 mb-5">Últimos 10 Tweets</h3>
           {loading ? (
-            <p className="text-center text-gray-400 text-xs py-10">Cargando...</p>
+            <p className="text-center text-stone-400 text-xs py-10">Cargando...</p>
           ) : last10.length === 0 ? (
-            <p className="text-center text-gray-400 text-xs py-10">Sin tweets todavía</p>
+            <p className="text-center text-stone-400 text-xs py-10">Sin tweets todavía</p>
           ) : (
             <div className="overflow-x-auto -mx-2">
               <table className="w-full text-sm min-w-[600px]">
                 <thead>
-                  <tr className="text-left border-b border-gray-100">
+                  <tr className="text-left border-b border-stone-100">
                     {["Cuenta", "Tono", "Tweet", "Horario", "Creado", "Estado"].map(h => (
-                      <th key={h} className="pb-3 pl-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide last:pr-0">{h}</th>
+                      <th key={h} className="pb-3 pl-2 pr-4 text-xs font-semibold text-stone-500 uppercase tracking-wide last:pr-0">
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-stone-50">
                   {last10.map(post => (
-                    <tr key={post.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-3 pl-2 pr-4 text-xs text-gray-500">
+                    <tr key={post.id} className="hover:bg-stone-50/70 transition-colors">
+                      <td className="py-3 pl-2 pr-4 text-xs text-stone-500">
                         @{post.accounts?.username ?? "—"}
                       </td>
                       <td className="py-3 pr-4">
-                        <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-md">
+                        <span className="bg-stone-100 text-stone-600 text-xs px-2 py-0.5 rounded-md">
                           {TONE_LABELS[post.tone ?? ""] ?? post.tone ?? "—"}
                         </span>
                       </td>
@@ -383,18 +372,16 @@ export default function AnalyticsPage() {
                           {post.content}
                         </span>
                       </td>
-                      <td className="py-3 pr-4 text-gray-400 text-xs whitespace-nowrap">
+                      <td className="py-3 pr-4 text-stone-400 text-xs whitespace-nowrap">
                         {post.scheduled_time
                           ? new Date(post.scheduled_time).toLocaleString("es-ES", {
-                              day: "2-digit", month: "short",
-                              hour: "2-digit", minute: "2-digit",
+                              day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
                             })
                           : "—"}
                       </td>
-                      <td className="py-3 pr-4 text-gray-400 text-xs whitespace-nowrap">
+                      <td className="py-3 pr-4 text-stone-400 text-xs whitespace-nowrap">
                         {new Date(post.created_at).toLocaleString("es-ES", {
-                          day: "2-digit", month: "short",
-                          hour: "2-digit", minute: "2-digit",
+                          day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
                         })}
                       </td>
                       <td className="py-3">

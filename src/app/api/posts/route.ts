@@ -5,7 +5,7 @@ export async function GET() {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("posts")
-    .select("*, accounts(username, display_name)")
+    .select("*, accounts(username)")
     .order("created_at", { ascending: false })
     .limit(50);
 
