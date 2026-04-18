@@ -168,8 +168,9 @@ export async function POST(request: NextRequest) {
     console.log(`[STEP] Generate tweets with AI — count=${totalTweets}, tone=${primaryAccount.tone ?? "casual"}, lang=${primaryAccount.language ?? "es"}`);
 
     let tweets;
+    let aiUsage;
     try {
-      tweets = await generateTweetsWithAIImproved({
+      const { tweets: generatedTweets, usage } = await generateTweetsWithAIImproved({
         topic: topic.trim(),
         count: totalTweets,
         tone: primaryAccount.tone ?? "casual",
@@ -178,6 +179,8 @@ export async function POST(request: NextRequest) {
         language: primaryAccount.language ?? "es",
         evergreenOnly: resolvedEvergreen,
       });
+      tweets = generatedTweets;
+      aiUsage = usage;
     } catch (aiError) {
       const msg = aiError instanceof Error ? aiError.message : String(aiError);
       console.error(`[STEP] Generate tweets with AI — ERROR: ${msg}`);
@@ -193,7 +196,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[STEP] Generate tweets with AI — generados: ${tweets.length} tweets`);
+    console.log(`[STEP] Generate tweets with AI — generados: ${tweets.length} tweets, costo=$${aiUsage?.estimated_cost_usd} (~$${aiUsage?.estimated_cost_per_tweet_usd}/tweet)`);
     for (let i = 0; i < tweets.length; i++) {
       console.log(`  Tweet ${i + 1}: [${tweets[i].tone}] "${tweets[i].text.slice(0, 60)}..." (${tweets[i].text.length} chars)`);
     }
@@ -298,6 +301,13 @@ export async function POST(request: NextRequest) {
             failedTweets.length > 0
               ? `${failedTweets.length} de ${tweets.length} tweets fallaron`
               : null,
+          input_tokens:                  aiUsage?.input_tokens               ?? null,
+          output_tokens:                 aiUsage?.output_tokens              ?? null,
+          total_tokens:                  aiUsage?.total_tokens               ?? null,
+          tweets_generated:              aiUsage?.tweets_generated           ?? null,
+          avg_tokens_per_tweet:          aiUsage?.avg_tokens_per_tweet       ?? null,
+          estimated_cost_usd:            aiUsage?.estimated_cost_usd         ?? null,
+          estimated_cost_per_tweet_usd:  aiUsage?.estimated_cost_per_tweet_usd ?? null,
         })
         .eq("id", batchId);
 
@@ -318,6 +328,7 @@ export async function POST(request: NextRequest) {
       tweetsScheduled: publishedTweets.length,
       tweetsFailed: failedTweets.length,
       tweets: allTweets,
+      usage: aiUsage,
       summary: `${publishedTweets.length} tweets programados en ${days} día${days > 1 ? "s" : ""} para ${displayUsername}.${failedTweets.length > 0 ? ` ${failedTweets.length} fallaron.` : ""}`,
     });
   } catch (error) {

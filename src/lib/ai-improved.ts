@@ -6,6 +6,12 @@ function getAnthropicClient() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 }
 
+// ── Pricing constants (USD per million tokens) ────────────────────────────────
+// Model: claude-haiku-4-5-20251001
+// Update these if the model or pricing changes.
+const PRICE_INPUT_PER_M  = 0.80;  // $0.80 per 1M input tokens
+const PRICE_OUTPUT_PER_M = 4.00;  // $4.00 per 1M output tokens
+
 export type TweetTone =
   | "casual"
   | "professional"
@@ -18,6 +24,16 @@ export interface GeneratedTweet {
   text: string;
   tone: TweetTone;
   length: number;
+}
+
+export interface TokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  tweets_generated: number;
+  avg_tokens_per_tweet: number;
+  estimated_cost_usd: number;
+  estimated_cost_per_tweet_usd: number;
 }
 
 // Fallback tone descriptions — used when account has no system_prompt
@@ -53,16 +69,14 @@ async function generateSingleTweet(
   tone: TweetTone,
   index: number,
   config: Pick<GenerateTweetsConfig, "systemPrompt" | "niche" | "language" | "evergreenOnly">
-): Promise<GeneratedTweet> {
+): Promise<{ tweet: GeneratedTweet; input_tokens: number; output_tokens: number }> {
   const { systemPrompt, niche, language = "es", evergreenOnly = false } = config;
   const toneDesc = TONE_PROMPTS[tone];
 
-  // Build context block from account config
   const nicheContext = niche
     ? `\nNicho de la cuenta: "${niche}" — asegúrate de que el contenido sea relevante para esta audiencia.`
     : "";
 
-  // If the account has a custom system_prompt, inject it as identity/voice block
   const voiceBlock = systemPrompt
     ? `\nVoz editorial de la cuenta:\n${systemPrompt}\n`
     : "";
@@ -96,6 +110,9 @@ Reglas de formato:
     messages: [{ role: "user", content: prompt }],
   });
 
+  const input_tokens  = message.usage?.input_tokens  ?? 0;
+  const output_tokens = message.usage?.output_tokens ?? 0;
+
   const rawText =
     message.content[0]?.type === "text" ? message.content[0].text.trim() : "";
 
@@ -104,16 +121,19 @@ Reglas de formato:
     throw new Error(`Claude devolvió texto vacío para tweet ${index + 1} (stop_reason: ${message.stop_reason})`);
   }
 
-  // Quitar comillas envolventes si Claude las incluyó
   const text = rawText.replace(/^["'""«]|["'""»]$/g, "").trim();
 
-  console.log(`[AI] Tweet ${index + 1} generado — tone=${tone}, chars=${text.length}`);
-  return { text, tone, length: text.length };
+  console.log(
+    `[AI] Tweet ${index + 1} generado — tone=${tone}, chars=${text.length}, ` +
+    `tokens=[in=${input_tokens} out=${output_tokens}]`
+  );
+
+  return { tweet: { text, tone, length: text.length }, input_tokens, output_tokens };
 }
 
 export async function generateTweetsWithAIImproved(
   config: GenerateTweetsConfig
-): Promise<GeneratedTweet[]> {
+): Promise<{ tweets: GeneratedTweet[]; usage: TokenUsage }> {
   const {
     topic,
     count = 5,
@@ -136,7 +156,6 @@ export async function generateTweetsWithAIImproved(
     ? (tone as TweetTone)
     : "casual";
 
-  // Distribute tones: first tweet uses baseTone, rest cycle through others
   const assignedTones: TweetTone[] = Array.from({ length: count }, (_, i) => {
     if (i === 0) return baseTone;
     const others = allTones.filter((t) => t !== baseTone);
@@ -146,6 +165,9 @@ export async function generateTweetsWithAIImproved(
   const editorialConfig = { systemPrompt, niche, language, evergreenOnly };
 
   const tweets: GeneratedTweet[] = [];
+  let totalInput  = 0;
+  let totalOutput = 0;
+
   const batchSize = 5;
 
   for (let i = 0; i < count; i += batchSize) {
@@ -153,19 +175,46 @@ export async function generateTweetsWithAIImproved(
     const results = await Promise.all(
       batch.map((t, j) => generateSingleTweet(topic, t, i + j, editorialConfig))
     );
-    tweets.push(...results);
+    for (const r of results) {
+      tweets.push(r.tweet);
+      totalInput  += r.input_tokens;
+      totalOutput += r.output_tokens;
+    }
   }
 
-  return tweets;
+  const total_tokens             = totalInput + totalOutput;
+  const tweets_generated         = tweets.length;
+  const avg_tokens_per_tweet     = tweets_generated > 0 ? Math.round(total_tokens / tweets_generated) : 0;
+  const estimated_cost_usd       = parseFloat(
+    ((totalInput / 1_000_000) * PRICE_INPUT_PER_M + (totalOutput / 1_000_000) * PRICE_OUTPUT_PER_M).toFixed(6)
+  );
+  const estimated_cost_per_tweet_usd = parseFloat(
+    (tweets_generated > 0 ? estimated_cost_usd / tweets_generated : 0).toFixed(6)
+  );
+
+  const usage: TokenUsage = {
+    input_tokens:               totalInput,
+    output_tokens:              totalOutput,
+    total_tokens,
+    tweets_generated,
+    avg_tokens_per_tweet,
+    estimated_cost_usd,
+    estimated_cost_per_tweet_usd,
+  };
+
+  console.log(`[TOKENS] input=${totalInput}`);
+  console.log(`[TOKENS] output=${totalOutput}`);
+  console.log(`[TOKENS] total=${total_tokens}`);
+  console.log(`[TOKENS] avg_per_tweet=${avg_tokens_per_tweet}`);
+  console.log(`[TOKENS] estimated_cost_usd=$${estimated_cost_usd}`);
+  console.log(`[TOKENS] estimated_cost_per_tweet_usd=$${estimated_cost_per_tweet_usd}`);
+
+  return { tweets, usage };
 }
 
 /**
  * Distributes scheduled_time slots across N days starting from startDate.
  * Tweets are spread through a daily window (8:00 – 22:00) with slight jitter.
- *
- * @param days          Number of days to schedule over
- * @param tweetsPerDay  Number of tweets per day
- * @param startDate     First day to schedule (defaults to tomorrow)
  */
 export function distributeScheduleTimes(
   days: number,
@@ -174,7 +223,6 @@ export function distributeScheduleTimes(
 ): Date[] {
   const times: Date[] = [];
 
-  // Default start: tomorrow at 08:00 local time
   const base = startDate ?? (() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -182,21 +230,18 @@ export function distributeScheduleTimes(
     return d;
   })();
 
-  const WINDOW_START_HOUR = 8;   // 08:00
-  const WINDOW_END_HOUR   = 22;  // 22:00
-  const WINDOW_MINUTES    = (WINDOW_END_HOUR - WINDOW_START_HOUR) * 60; // 840 min
+  const WINDOW_START_HOUR = 8;
+  const WINDOW_END_HOUR   = 22;
+  const WINDOW_MINUTES    = (WINDOW_END_HOUR - WINDOW_START_HOUR) * 60;
 
   for (let day = 0; day < days; day++) {
     for (let slot = 0; slot < tweetsPerDay; slot++) {
-      // Even spacing within the daily window
       const slotMinutes =
         tweetsPerDay === 1
-          ? WINDOW_MINUTES / 2 // single tweet at noon-ish
+          ? WINDOW_MINUTES / 2
           : (slot / (tweetsPerDay - 1)) * WINDOW_MINUTES;
 
-      // ±10 min jitter to feel natural
       const jitterMinutes = (Math.random() - 0.5) * 20;
-
       const totalMinutes = WINDOW_START_HOUR * 60 + slotMinutes + jitterMinutes;
       const hours   = Math.floor(totalMinutes / 60);
       const minutes = Math.round(totalMinutes % 60);
